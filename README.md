@@ -1,79 +1,88 @@
-# Stock News Discord Bot
+# Iris — bot de Discord para vigilar acciones
 
-Bot que monitorea acciones (tickers) y publica noticias nuevas en un canal
-de Discord cada hora, con comandos para administrar la lista.
+Iris vigila tu lista de acciones, publica noticias cada hora, te avisa
+cuando el precio sube o baja más de un umbral y responde con personalidad.
+
+> Nada de lo que publica Iris es asesoramiento financiero. Las alertas, el
+> sentimiento y las lecturas de IA son datos de contexto, no predicciones.
 
 ## Comandos
 
-- `/add TICKER` — agrega una acción a la lista (ej: `/add AAPL`)
-- `/remove TICKER` — la quita de la lista
-- `/list` — muestra las acciones monitoreadas
-- `/checknow` — fuerza una revisión inmediata (sin esperar la hora)
-- `/sentiment TICKER` — muestra el resumen de sentimiento al toque, sin
-  esperar al chequeo horario
-- `/opinion TICKER` — le pide a la IA una lectura de las noticias
-  recientes, al toque
+**Mi lista** (aceptan varios símbolos separados por coma)
+- `/add AAPL, NVDA` — agrega acciones y avisa si Finnhub no tiene datos de alguna
+- `/remove AAPL` — las quita (con autocompletado)
+- `/list` — muestra la lista
 
-## Fuentes de noticias
+**Precios y mercado** (Finnhub)
+- `/precio AAPL` — precio, variación del día, apertura, máx. y mín.
+- `/resumen` — tabla de toda tu lista con 📈/📉, mejor y peor del día
+- `/humor` — cómo se siente Iris hoy según el promedio de tu lista
+- `/mercado` — titulares generales del mercado
 
-- **Finnhub** — titulares y links de noticias por empresa.
-- **Alpha Vantage** (opcional pero recomendado) — además de titulares,
-  trae un puntaje de sentimiento por noticia. Con esto el bot arma un
-  resumen tipo "🔺 Señales alcistas — posiblemente por X motivo" o
-  "🔻 Señales bajistas — posiblemente por Y motivo", agregando el
-  sentimiento de las noticias recientes de cada ticker.
+**Alertas y control** (no necesitan nada extra)
+- `/umbral 5` — % de movimiento diario que dispara una alerta (por defecto 3)
+- `/alertas activar|desactivar` — enciende o apaga las alertas de precio
+- `/pausa` y `/reanudar` — pausa o reactiva todos los mensajes automáticos
+- `/estado` — modo, umbral, última revisión, tiempo en línea y fuentes activas
+- `/checknow` — fuerza una revisión de noticias (últimas 24 h) y explica qué encontró
 
-  ⚠️ **Importante:** esto es una heurística basada en el tono de la
-  cobertura de noticias reciente, no una predicción financiera. Ninguna
-  señal de sentimiento garantiza hacia dónde se va a mover el precio —
-  úsalo como un dato más, no como una recomendación de inversión.
+**Opcionales**
+- `/sentiment AAPL` — sentimiento de las noticias (necesita Alpha Vantage)
+- `/opinion AAPL` — lectura de IA de las noticias (necesita API de Anthropic)
 
-  El plan gratuito de Alpha Vantage tiene un límite de 25 consultas por
-  día, así que si monitoreás muchos tickers a la vez podés llegar al
-  límite; en ese caso el bot simplemente omite el resumen de sentimiento
-  para esa vuelta y sigue funcionando con las noticias de Finnhub.
+**Para divertirse**
+- `/oraculo ¿pregunta?` — respuestas al azar de Iris. Es un juego, no una señal.
+- `/ayuda` — resumen de todo lo anterior
 
-- **IA (opcional)** — cada 5 horas, si hay noticias nuevas, el bot le
-  pasa los titulares recientes de cada ticker a la API de Claude y pide
-  un párrafo breve explicando qué factores podrían presionar el precio
-  al alza o a la baja. El prompt está armado explícitamente para que
-  **no** dé predicciones categóricas ni recomendaciones de compra/venta
-  — es una lectura de contexto, no una señal de trading.
+## Qué publica solo
 
-  Para activarlo necesitás una cuenta en https://console.anthropic.com
-  (distinta de tu cuenta normal de claude.ai) y generar una API key ahí.
-  Esto tiene costo por uso (facturado por Anthropic), aunque para el
-  volumen de este bot es un gasto mínimo. Configurá `ANTHROPIC_API_KEY`
-  para activarlo; sin esa variable, el bot simplemente no manda esta
-  parte y sigue funcionando igual con noticias + sentimiento.
+- **Cada hora:** noticias nuevas de cada acción (Finnhub) y, si configuraste
+  Alpha Vantage, un resumen de sentimiento con 🔺/🔻.
+- **Cada 15 minutos:** compara el cambio diario de cada acción contra el
+  umbral. Si lo supera, publica una alerta 📈/📉. No repite la misma alerta;
+  vuelve a avisar solo si el movimiento se duplica, cambia de signo o es otro día.
+- **Cada 5 horas (opcional):** lectura de IA de las noticias recientes.
+
+## Importante: cobertura de Finnhub
+
+El plan gratuito de Finnhub solo cubre acciones de **EE.UU. y Canadá**.
+Para acciones de otras bolsas (Tokio, Corea, Milán...) no habrá precio,
+noticias ni alertas. `/add` te avisa cuando pasa esto.
 
 ## 1. Crear el bot en Discord
 
 1. Andá a https://discord.com/developers/applications → **New Application**.
-2. En **Bot**, creá un bot y copiá el **Token** (esto es `DISCORD_TOKEN`).
-3. En **Bot**, activá el permiso *Send Messages* (no hace falta ningún
-   Privileged Intent para este bot).
-4. En **OAuth2 → URL Generator**, marcá los scopes `bot` y `applications.commands`,
-   y en permisos marcá `Send Messages` y `Embed Links`. Abrí la URL generada
-   e invitá el bot a tu servidor.
-5. Con "modo desarrollador" activado en Discord (Configuración → Avanzado),
-   click derecho sobre el canal donde querés las noticias → **Copiar ID**.
-   Eso es `DISCORD_CHANNEL_ID`.
+2. En **Bot**, copiá el **Token** (`DISCORD_TOKEN`). Si lo pegás en algún
+   lado por error, usá **Reset Token** y cargá el nuevo.
+3. En **OAuth2 → URL Generator**, marcá los scopes `bot` y
+   `applications.commands`, y los permisos `Send Messages` y `Embed Links`.
+   Abrí la URL e invitá el bot a tu servidor.
+4. Con el modo desarrollador activado (Configuración → Avanzado), clic
+   derecho sobre el canal → **Copiar ID de canal** (`DISCORD_CHANNEL_ID`).
+   Ojo: es el ID del **canal**, no el del bot.
 
-## 2. Obtener API keys de noticias
+## 2. API keys
 
-**Finnhub (obligatorio, titulares):**
-1. Creá una cuenta en https://finnhub.io/register
-2. Copiá tu API key del dashboard → esto es `FINNHUB_API_KEY`.
-   El plan gratuito alcanza sin problema para consultas cada hora.
+- **Finnhub (obligatoria):** https://finnhub.io/register → `FINNHUB_API_KEY`.
+  Gratis, sin tarjeta.
+- **Alpha Vantage (opcional):** https://www.alphavantage.co/support/#api-key
+  → `ALPHAVANTAGE_API_KEY`. El plan gratuito permite unas 25 consultas por día.
+- **Anthropic (opcional):** https://console.anthropic.com → `ANTHROPIC_API_KEY`.
+  Se cobra por uso.
 
-**Alpha Vantage (opcional, sentimiento):**
-1. Pedí una key gratis en https://www.alphavantage.co/support/#api-key
-2. Esto es `ALPHAVANTAGE_API_KEY`. Si no la configurás, el bot sigue
-   funcionando normal, solo que sin el resumen de sentimiento ni el
-   comando `/sentiment`.
+## 3. Variables de entorno
 
-## 3. Probarlo localmente (opcional)
+| Variable | Obligatoria | Para qué |
+|---|---|---|
+| `DISCORD_TOKEN` | sí | Token del bot |
+| `DISCORD_CHANNEL_ID` | sí | Canal donde publica Iris |
+| `FINNHUB_API_KEY` | sí | Precios y noticias |
+| `ALPHAVANTAGE_API_KEY` | no | Sentimiento |
+| `ANTHROPIC_API_KEY` | no | Lectura de IA |
+| `INITIAL_TICKERS` | no | Lista inicial, ej: `AAPL,NVDA,TSLA` |
+| `DATA_DIR` | no | Carpeta de los archivos guardados, ej: `/data` |
+
+## 4. Probarlo localmente
 
 ```bash
 pip install -r requirements.txt
@@ -81,41 +90,30 @@ pip install -r requirements.txt
 export DISCORD_TOKEN="tu_token"
 export DISCORD_CHANNEL_ID="1234567890"
 export FINNHUB_API_KEY="tu_api_key"
-export ALPHAVANTAGE_API_KEY="tu_api_key"  # opcional
-export ANTHROPIC_API_KEY="tu_api_key"     # opcional
 
 python bot.py
 ```
 
-## 4. Desplegarlo gratis (para que quede corriendo 24/7)
+## 5. Desplegarlo en Railway
 
-**Opción recomendada: Railway**
+1. Subí los cuatro archivos (`bot.py`, `requirements.txt`, `Procfile`,
+   `README.md`) a un repo de GitHub.
+2. En https://railway.app → **New Project → Deploy from GitHub repo**.
+3. En **Variables**, cargá las de la tabla de arriba.
+4. Railway detecta el `Procfile` y arranca el bot.
 
-1. Subí esta carpeta a un repo de GitHub (puede ser privado).
-2. Andá a https://railway.app → **New Project → Deploy from GitHub repo**.
-3. Elegí el repo. Railway detecta el `Procfile` y arranca el worker solo.
-4. En **Variables**, agregá `DISCORD_TOKEN`, `DISCORD_CHANNEL_ID`,
-   `FINNHUB_API_KEY` y, si los usás, `ALPHAVANTAGE_API_KEY` y
-   `ANTHROPIC_API_KEY`.
-5. Railway te da créditos gratis mensuales que alcanzan de sobra para un
-   bot chico como este.
+Al actualizar `bot.py` en GitHub, Railway redespliega solo. Si los
+comandos nuevos no aparecen enseguida en Discord, esperá unos minutos o
+reiniciá la app de Discord.
 
-**Alternativa: Fly.io** — funciona parecido, usando `fly launch` y
-`fly secrets set` para las variables de entorno en vez del panel web.
+## 6. Que no se pierdan tus datos
 
-## Cómo funciona
+Los archivos `tickers.json`, `settings.json` y `seen_news.json` viven en
+el disco del servicio. En Railway, sin un volumen, ese disco se borra en
+cada redespliegue, y perderías la lista, el umbral y la pausa. Dos formas
+de evitarlo:
 
-- Los tickers se guardan en `tickers.json` (se crea solo al usar `/add`).
-- Cada hora, el bot revisa noticias de las últimas 2 horas por cada ticker
-  vía Finnhub y publica solo las que no mandó antes (registradas en
-  `seen_news.json`).
-- `/checknow` corre esa misma revisión al toque, útil para probar que todo
-  funciona sin esperar una hora entera.
-
-## Nota sobre el almacenamiento
-
-Los archivos `tickers.json` y `seen_news.json` viven en el disco del
-hosting. En Railway/Fly.io con un solo servicio esto persiste entre
-reinicios normales, pero si el proyecto crece te conviene migrar a una
-base de datos (ej. SQLite con un volumen persistente, o Postgres gratis
-de Railway) para no depender del filesystem.
+- **Gratis:** cargá `INITIAL_TICKERS` con tu lista. Si el archivo no
+  existe, Iris arranca con esa lista. (El umbral y la pausa sí se pierden.)
+- **Completa:** agregá un Volume al servicio con punto de montaje `/data`
+  y cargá `DATA_DIR=/data`. Tiene un costo pequeño por GB al mes.
